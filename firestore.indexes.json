@@ -1,0 +1,5 @@
+{
+  "//": "Empty on purpose. Every query the API issues is a single-field equality or a single-field range plus an orderBy on that same field, all of which Firestore's automatic indexes already serve. List endpoints that need substring search, OR across fields, or sorting by a joined value load their candidate set and finish the work in memory (see backend/src/db.ts). Add composite indexes here only if you introduce a query that needs one — the CLI prints the exact definition when it does.",
+  "indexes": [],
+  "fieldOverrides": []
+}

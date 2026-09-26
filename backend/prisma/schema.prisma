@@ -1,0 +1,183 @@
+// Class Manager data model.
+//
+// SQLite has no native enum type, so role/status columns are plain strings that
+// are validated with the zod schemas in src/schemas.ts against the constants in
+// @cm/shared. Switching to Postgres is a provider + DATABASE_URL change; nothing
+// in this file is SQLite-specific beyond that.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String @id @default(cuid())
+  username     String @unique
+  passwordHash String
+  role         String // ADMIN | TEACHER | STUDENT
+
+  realName String
+  email    String  @unique
+  age      Int?
+  phone    String?
+
+  emergencyContactName     String?
+  emergencyContactPhone    String?
+  emergencyContactRelation String?
+
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  taughtCourses    Course[]        @relation("CourseTeacher")
+  enrollments      Enrollment[]
+  attendance       Attendance[]    @relation("AttendanceStudent")
+  recordedMarks    Attendance[]    @relation("AttendanceRecorder")
+  changeRequests   ChangeRequest[] @relation("ChangeRequester")
+  reviewedRequests ChangeRequest[] @relation("ChangeReviewer")
+  auditLogs        AuditLog[]
+
+  @@index([role])
+}
+
+/// One class (a course section). Named `Course` because `class` is a reserved
+/// word in TypeScript; the UI labels it "Class" throughout.
+model Course {
+  id          String  @id @default(cuid())
+  code        String  @unique
+  name        String
+  description String?
+  room        String?
+  term        String
+  capacity    Int     @default(30)
+  active      Boolean @default(true)
+
+  teacherId String?
+  teacher   User?   @relation("CourseTeacher", fields: [teacherId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  slots          ScheduleSlot[]
+  sessions       Session[]
+  enrollments    Enrollment[]
+  changeRequests ChangeRequest[]
+
+  @@index([teacherId])
+  @@index([term])
+}
+
+/// The recurring weekly pattern a class meets on. Concrete dated `Session` rows
+/// are generated from these.
+model ScheduleSlot {
+  id        String @id @default(cuid())
+  courseId  String
+  course    Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  dayOfWeek Int // 0 = Sunday .. 6 = Saturday
+  startTime String // "09:00"
+  endTime   String // "10:30"
+
+  @@index([courseId])
+}
+
+/// A single dated meeting of a class. Attendance and teacher check-in hang off this.
+model Session {
+  id       String @id @default(cuid())
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  startsAt DateTime
+  endsAt   DateTime
+  room     String?
+  status   String   @default("SCHEDULED") // SCHEDULED | COMPLETED | CANCELLED
+
+  teacherCheckedInAt DateTime?
+  teacherNote        String?
+
+  attendance     Attendance[]
+  changeRequests ChangeRequest[]
+
+  @@unique([courseId, startsAt])
+  @@index([startsAt])
+}
+
+model Enrollment {
+  id        String @id @default(cuid())
+  studentId String
+  student   User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  courseId  String
+  course    Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  status    String @default("ENROLLED") // ENROLLED | WAITLISTED | DROPPED
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studentId, courseId])
+  @@index([courseId])
+}
+
+model Attendance {
+  id        String  @id @default(cuid())
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  studentId String
+  student   User    @relation("AttendanceStudent", fields: [studentId], references: [id], onDelete: Cascade)
+
+  status String  @default("PRESENT") // PRESENT | LATE | ABSENT | EXCUSED
+  note   String?
+
+  recordedById String?
+  recordedBy   User?    @relation("AttendanceRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
+  recordedAt   DateTime @default(now())
+
+  @@unique([sessionId, studentId])
+  @@index([studentId])
+  @@index([status])
+}
+
+/// Teachers file these to ask an admin to change a schedule, room, or roster.
+model ChangeRequest {
+  id     String @id @default(cuid())
+  type   String // SCHEDULE_CHANGE | ROOM_CHANGE | CANCEL_SESSION | ROSTER_CHANGE | OTHER
+  status String @default("PENDING") // PENDING | APPROVED | REJECTED
+
+  details       String
+  proposedValue String?
+
+  requesterId String
+  requester   User   @relation("ChangeRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+
+  courseId  String?
+  course    Course?  @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  sessionId String?
+  session   Session? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  reviewedById String?
+  reviewedBy   User?     @relation("ChangeReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewNote   String?
+  reviewedAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([status])
+  @@index([requesterId])
+}
+
+model AuditLog {
+  id       String  @id @default(cuid())
+  actorId  String?
+  actor    User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action   String // e.g. "user.create", "enrollment.delete"
+  entity   String
+  entityId String?
+  detail   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entity])
+}

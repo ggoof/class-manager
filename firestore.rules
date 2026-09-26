@@ -1,0 +1,21 @@
+rules_version = '2';
+
+// Nothing reaches Firestore from a browser.
+//
+// The API is the only client, and it authenticates with a service account —
+// which bypasses these rules entirely, so denying everything here costs the app
+// nothing and closes the door on the alternative. That matters more than usual
+// in this codebase: every authorization decision (a teacher may only touch
+// sessions for classes they teach, password hashes never leave the server, only
+// admins may read the audit log) lives in the Fastify routes. A client with
+// direct Firestore access would answer to none of it.
+//
+// If you ever add a feature that reads Firestore from the browser, write the
+// per-collection rules to match the API's checks — do not open this up wholesale.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,18 @@
+node_modules/
+dist/
+*.local
+.env
+.DS_Store
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+serviceAccount*.json
+
+# Cloud Functions bundle
+functions/lib/
+
+# Local only
+backend/prisma/dev.db
+.claude/settings.local.json
