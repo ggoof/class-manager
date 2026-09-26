@@ -3,12 +3,6 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { homeFor, useAuth } from '../lib/auth';
 import { Field, Loading, Notice } from '../components/ui';
 
-const DEMO = [
-  ['admin', 'Admin'],
-  ['tanaka', 'Teacher'],
-  ['alice', 'Student'],
-] as const;
-
 export function Login() {
   const { user, loading, signIn } = useAuth();
   const navigate = useNavigate();
@@ -70,25 +64,6 @@ export function Login() {
         <p style={{ textAlign: 'center', marginBottom: 0 }}>
           New here? <Link to="/register">Create a student account</Link>.
         </p>
-
-        <div className="demo-accounts">
-          Demo accounts (password <code className="mono">password123</code>):
-          <div>
-            {DEMO.map(([name, role]) => (
-              <button
-                key={name}
-                type="button"
-                className="small"
-                onClick={() => {
-                  setUsername(name);
-                  setPassword('password123');
-                }}
-              >
-                {role} · {name}
-              </button>
-            ))}
-          </div>
-        </div>
       </form>
     </div>
   );
